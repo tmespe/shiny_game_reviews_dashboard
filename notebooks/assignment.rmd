@@ -1,0 +1,767 @@
+---
+title: "Video games development"
+author: "Terje Espedal"
+date: "February 6, 2022"
+output:
+  prettydoc::html_pretty:
+    toc: true
+    toc_depth: 2
+    highlight: github
+---
+
+```{r, echo = F}
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+```
+
+# Video games development over time.
+This notebook serves two purposes. In the first part of the notebook I will provide the code to get updated data of
+all games and companies from [IGDB ( Internet Games Database)](https://www.igdb.com/about).
+In the second part I will give a brief overview and analysis of the IGDB games and companies
+data.
+
+IGDB is a video games website originally created by video game fans to catalogue unbiased information about games. It uses
+a mix of automation and user contributions to gather it's data, combined with a verification system. It provides an extensive
+API accessible to third-parties.
+
+IGDB was acquired by Twitch (Amazon) in 2019, but has by all appearances remained unbiased. Twitch, among other things,
+uses IGDB to populate it's search function.
+
+The IGDB dataset is among the most extensive video game datasets available, and it's information is both deep in terms of
+the amount of games and companies, and wide in terms of the amount of variables. It provides an interesting starting point
+to delve deeper into video game history, to discover how games have evolved over time, but also in order to examine how
+games are rated critically by professional game reviewers as well as by users.
+
+### Part 1
+To get the updated data it's assumed that you already have Twitch API access. If
+you don't, please see the [Twitch API documentation](https://dev.twitch.tv/docs/api/) for instructions on how to get access,
+or skip to part two which contains a brief overview and analysis of the IGDB company and games data.
+
+If you do have access, make sure to create a .env file in the same folder as the script with the following:
+
+| Name                 | Value                     |
+|----------------------|---------------------------|
+| TWITCH_CLIENT_ID     | Your Twitch Client ID     |
+| TWITCH_CLIENT_SECRET | Your Twitch Client Secret |
+
+Make sure the names are upper case.
+
+### Part 2
+[In part 2](#analysis) I will give a brief overview and analysis of video games development over time. The data is taken from
+[IGDB](https://www.igdb.com/) which is a continuously updated database of video games. It currently consists of *150.491
+* unique game titles, *39.211 companies* and *52.784 external reviews*, among other things.
+
+In this analysis I will focus mainly on game titles with reviews, as well as company data.
+
+
+## Load necessary libraries
+There are quite a few libraries needed to run the entire notebook. As the notebook is divided into to parts, one for the
+analysis and one for the API, I have divided the libraries in two as well. You can comment out any part you don't need.
+```{r, message = FALSE, warning = FALSE}
+# Needed for analysis
+library("tidyverse")
+library("stringr")
+library("data.table")
+library("lubridate")
+library("ggthemes")
+library("gt")
+library("janitor")
+
+# Needed for API access
+library("jsonlite")
+library("httr")
+library("dotenv")
+library("here")
+
+# Get bearer token from Twitch
+#current_dir <- here()
+#setwd("/home/tmespe/Dropbox/emlyon/Coding with r & shiny/Assingment/v2")
+#setwd(current_dir)
+load_dot_env()
+client_id <- Sys.getenv("TWITCH_CLIENT_ID")
+client_secret <- Sys.getenv("TWITCH_CLIENT_SECRET")
+```
+
+## <a name="part1">Set up API access and defining functions for getting API data</a>
+For our video games data we will be using IGDB's API to get their most up to date data about games and companies.
+In order to access the API we'll first need to get a Twitch authorization token. The steps for getting a Twitch account
+and setting up your account to get API access can be found on the [Twitch API documentation page](https://dev.twitch.tv/docs/api/).
+
+For the rest of the code it is assumed you have access to the Twitch API and have put a *.env* file in the current
+folder with your TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET.
+
+`get_twitch_token()` returns a Twitch authorization token, which is needed for the rest of the code.
+```{r, message = FALSE, warning = FALSE}
+get_twitch_token <- function() {
+  #' Get a twitch authentication token from the Twitch API
+  #'
+  #' @description
+  #' The get_twitch_token function get's a Twitch bearer token from the
+  #'   Twitch API. It will look for TWITCH_CLIENT_ID, and TWITCH_CLIENT_SECRET
+  #'    in a .env in the same folder as the script. It if credentials are valid
+  #'   a Twitch authentication token is returned
+  url <- "https://id.twitch.tv/oauth2/token"
+
+  query_string <- list(
+    client_id = client_id,
+    #token = paste("Bearer", bearer_token)
+    client_secret = client_secret,
+    grant_type = "client_credentials"
+
+  )
+
+  response <-
+    VERB(
+      "POST",
+      url,
+      query = query_string,
+      content_type("application/json"),
+      accept("application/json")
+    )
+  token <- fromJSON(rawToChar(response$content))
+  return(token$access_token)
+}
+
+```
+## Get data from any IGDP endpoint
+`get_from_igdb()` Uses the Twitch token to get data from any [valid IGDB endpoint](https://api-docs.igdb.com/#about).
+It returns a dataframe with the content of the endpoint if it was valid. By default it gets all fields for the endpoint
+with the max limit of 500 items per page.
+
+```{r, message = FALSE, warning = FALSE}
+get_from_igdb <-
+  function(token, endpoint, query_string = "fields *; limit 500;") {
+    #' Get data for a given endpoint from IGDB.com
+    #'
+    #' @description
+    #' The get_from_igdb function will return the json content for any given
+    #' valid IGDB API endpoint
+    #'
+    #' @param token A valid twitch bearer token for accessing the API
+    #' @param endpoint A valid IGDB endpoint. See https://api-docs.igdb.com/#about
+    #'  for valid endpoints
+    #' @param query_string A valid query string determining what data to get.
+    #' By default returns all fields with the API
+    #'   limit of 500 result per page
+    base_url <- "https://api.igdb.com/v4/"
+
+    response <-
+      VERB(
+        "POST",
+        paste0(base_url, endpoint),
+        add_headers(
+          "Content-Type" = "application/json",
+          Accept = "application/+json",
+          "Client-ID" = client_id,
+          "Authorization" = paste("Bearer", token)
+        ),
+        body = query_string
+      )
+    if (response$status_code == 200 & length(response$content) > 1) {
+      return(list(response, fromJSON(rawToChar(
+        response$content
+      ))))
+
+    } else if (response$status_code == 400) {
+      return()
+    } else {
+      Sys.sleep(4)
+      get_from_igdb(token, endpoint = endpoint, query_string = query_string)
+    }
+  }
+
+```
+## Getting all games from IGDP API
+`get_all_games()` gets a dataframe of all games in the IGDB database. It is customizable in that you can change the
+parameter n to limit how many games are returned. By default it is set to 180.000 games, which covers the max games on
+IGDB as of Feb. 5. 2022.
+```{r eval = F, message = FALSE, warning = FALSE}
+get_all_games <- function(n = 190000,
+                          incremental_save = FALSE, fields = NULL) {
+  #' Save and return a list of all games on IGDB
+  #'
+  #' @description get_all_games returns a and saves a dataframe to disk with
+  #'   all games currently on IGDB.
+  #'   The file saved on disk will be games.RData prefixed by YYYYMMDD_HHMMSS.
+  #'
+  #' @param n The number of games to return. Defaults to 1800000 which
+  #'   currently fetches all games.
+  #' @param incermental_save Whether to save data incrementaly. Defaults to false.
+  # Set query string to get all fields and 500 games per query, which is max.
+  fields <- c("id", "name", "external_games.id", "external_games.url", "external_games.countries", "first_release_date",
+              "game_modes", "genres.name", "genres.id", "platforms.name", "platforms.platform_family.name", "platforms.id", "release_dates.date",
+              "release_dates.platform", "similar_games.id", "summary", "themes.name", "websites.url",
+              "age_ratings.rating", "age_ratings.category", "age_ratings.synopsis", "involved_companies",
+              "parent_game", "rating", "rating_count", "total_rating", "total_rating_count", "game_engines.name",
+              "game_engines.companies", "keywords.name", "player_perspectives.name", "collection.name", "storyline",
+              "hypes", "follows", "aggregated_rating", "aggregated_rating_count", "multiplayer_modes", "cover.url")
+  # fields <- c("id", "name", "external_games.id", "external_games.url", "external_games.countries", "first_release_date",
+  #             "game_modes", "genres.name", "genres.id", "platforms.name", "platforms.id", "release_dates.date",
+  #             "release_dates.platform", "similar_games.id", "summary", "themes.name", "websites.url",
+  #             "age_ratings.rating", "age_ratings.category", "age_ratings.synopsis", "involved_companies.company",
+  #             "parent_game", "rating", "rating_count", "total_rating", "total_rating_count", "game_engines.name",
+  #             "game_engines.companies", "keywords.name", "player_perspectives.name", "collection.name")
+   fields <- toString(fields)
+  query_string <- paste0("fields ", fields, " ;", "limit 500;", collapse = "")
+
+  # Get twitch token for authentication
+  token <- get_twitch_token()
+
+  # Get initial 500 games using get_from_igdb setting endpoint to games
+  all_games <-
+    get_from_igdb(token, "games", query_string = query_string)[[2]]
+
+  # Create a sequence from 1-n by 500 in order to set offset to skip previous
+  # 500 games and get all games.
+  for (num in seq(1, n, by = 500)) {
+    # Set offset to be previous offset + 500
+    query_string <- paste(query_string, "offset", num, ";")
+    games <- get_from_igdb(token, "games", query_string)[[2]]
+    # Update dataframe with next 500 batch of games
+    all_games <- bind_rows(all_games, games)
+
+    # Save every 500 batch to disk if incremental enabled
+    if (incremental_save == TRUE) {
+      export_json <- toJSON(all_games)
+      write(export_json, paste("Saved games", num, sep = "_"))
+    }
+
+    # Print batch fetched since process can take a long time
+    print(paste("Saved games", num - 500, num))
+  }
+  save(all_games, file = paste0(format(Sys.time(), "%Y%m%d_%H%M%S_"), "games.RData"))
+  return(all_games)
+}
+
+games_df <- get_all_games(incremental_save = F)
+```
+## Getting all companies with logos from IGDB
+`get_all_companies()` gets a dataframe of all companies in the IGDB database. You can customize the amount of companies
+returned by adjusting the n argument. By default it is set to 40.000 games, which covers the full range of companies on
+IGDB as of Feb. 5. 2022. Urls for company logos are also fetched from the API and merged to the returned companies
+dataset.
+```{r eval = F, message = FALSE, warning = FALSE}
+get_all_companies <- function(n_comp = 40000) {
+  #' Gets all companies with logo from the IGDB API
+  #'
+  #' @description Gets all companies from IGDB as well as URL to their logo
+  #'   and returns a dataframe and saves a file with all company
+  #'   info and a url to the company logo. The file saved on disk will be
+  #'   games.RData prefixed by YYYYMMDD_HHMMSS.
+  #'
+  #' @param n_comp Number of companies to fetch. Defaults to 40.000
+  #'   which is currently all companies
+
+  # Set query string to return all companies that have either published or 
+  # developed a game
+  query_string <-
+    "fields *; where developed != null | published != null; limit 500;"
+  # Initialize companies dataframe with first batch
+  all_companies <-
+    get_from_igdb(token, "companies", query_string = query_string)[[2]]
+  # Initialize logos dataframe with first batch
+  all_logos <-
+    get_from_igdb(token, "company_logos", "fields id, url; limit 500;")[[2]]
+
+  # Create a sequence from 1-n by 500 in order to set offset to skip 
+  # previous 500 companies and get all companies.
+  for (num in seq(500, n_comp, by = 500)) {
+    # Set offset to be previous offset + 500
+    query_string <- paste(query_string, "offset", num, ";")
+
+    # Get companies and logos
+    companies <-
+      get_from_igdb(token, "companies", query_string = query_string)[[2]]
+    logos <-
+      get_from_igdb(
+        token,
+        "company_logos",
+        query_string = paste("fields id, url; limit 500; offset", num, ";")
+      )[[2]]
+
+    # Update dataframes with next 500 batch of companies
+    all_logos <- bind_rows(all_logos, logos)
+    all_companies <- bind_rows(all_companies, companies)
+  }
+  # Merge comapnies with logos on logo = id. Save to RData
+  all_companies <- all_companies %>%
+    left_join(all_logos, by = c("logo" = "id")) %>%
+    rename(logo_url = url.y, info_url = url.x)
+  save(all_companies, file = paste0(format(Sys.time(), "%Y%m%d_%H%M%S_"), "companies.RData"))
+  return(all_companies)
+}
+
+#companies_df <- get_all_companies()
+```
+
+## Getting all release dates
+Since games can have different release dates for different platforms,
+in order to correctly get release dates for different platforms we need to get
+all releases for a platforms that will later be merged with the platforms
+and games datasets.
+```{r eval = F, message = FALSE, warning = FALSE}
+get_release_dates <- function(games, chunks = 500) {
+  #' Gets release dates for all platforms for a list of games
+  #'
+  #' @description Gets release dates for every platform registered on IGDB for a
+  #'   list of games and returns a
+  #'   dataframe with all release_dates and saves the dataframe to disk.
+  #'
+  #'
+  #' @param games List of games to get release dates for
+  #' @param chunks How many games to divide query into. By default 500 which is
+  #'    max limit on IGDB.
+
+  # Set query string to return all companies that have either published or 
+  # developed a game
+  divisions <-  split(games, ceiling(seq_along(games) / chunks))
+  query_string <-
+    paste0("fields *; where game = (",
+           paste(divisions[[1]], collapse = ","),
+           "); limit 500;")
+  # Initialize companies dataframe with first batch
+  all_release_dates <-
+    get_from_igdb(token, "release_dates", query_string = query_string)[[2]]
+
+  # Create a sequence from 1-n by 500 in order to set offset to skip previous 
+  # 500 companies and get all companies.
+  for (div in seq_along(divisions)) {
+    # Set offset to be previous offset + 500
+    query_string <-
+      paste0("fields *; where game = (",
+             paste(divisions[[div]], collapse = ","),
+             "); limit 500;")
+
+    # Get companies and logos
+    release_dates <-
+      get_from_igdb(token, "release_dates", query_string = query_string)[[2]]
+
+    # Update dataframes with next 500 batch of companies
+    all_release_dates <- bind_rows(all_release_dates, release_dates)
+    print(paste("Saved release dates for chunk", div, "of ", length(divisions)))
+
+  }
+  # Save to RData
+  all_release_dates <- all_release_dates %>%
+    rename(game_id = game, platform_id = platform)
+  save(
+    all_release_dates,
+    file = paste0(format(Sys.time(), "%Y%m%d_%H%M%S_"), "release_dates.RData"),
+    compress = T
+  )
+  return(all_release_dates)
+}
+#release_dates <- get_release_dates(games_with_reviews$id)
+```
+## Getting genres, platforms, game_modes, player_perspectives and platform_family from IGDB
+Since IGDB uses a database style model for it's APIs we have to get some additional data from the API to complete our
+game dataset with interpretable values. In the games dataset genres, platforms, game_modes, player_perspectives, as well as
+platform_family are all a set of foreign keys to other tables. In order to get the names of these we have to fetch
+the data from the respective endpoints. These will later be joined to the games table for analysis.
+```{r message = FALSE, warning = FALSE}
+token <- get_twitch_token()
+igdb_genres <-
+  get_from_igdb(token, "genres", "fields id,name; limit 500;")[[2]] %>%
+  rename(genre_id = id)
+igdb_platforms <-
+  get_from_igdb(
+    token,
+    "platforms",
+    "fields id, name, category, platform_family, generation, platform_logo; limit 500;"
+  )[[2]]
+igbdb_game_modes <-
+  get_from_igdb(token, "game_modes", "fields id, name; limit 500;")[[2]] %>%
+  rename(game_mode_id = id)
+igdb_player_perspectives <-
+  get_from_igdb(token, "player_perspectives", "fields id, name; limit 500;")[[2]] %>%
+  rename(p_perspec = id)
+igdb_platform_family <-
+  get_from_igdb(token, "platform_families", "fields id, name; limit 500;")[[2]]
+igdb_release_dates <-
+  get_from_igdb(token,
+                "release_dates",
+                "fields id, game, platform, date;  where game = 3454; limit 500;")[[2]]
+```
+
+
+# Analysis
+In this part I will give an overview and brief analysis of the dataset. As mentioned, the data has been gathered from
+IGDB through their public API.
+
+Provided with the notebook is a set of static datasets that were collected on *Feb. 5. 2022*. If you are interested in
+an up to date dataset you can check [part one](#part1) of this notebook. The first dataset contains a list of all games registered on
+IGDB.
+```{r}
+load("20220214_143056_games.RData")
+#load("20220211_072650_companies.RData")
+load(url("https://github.com/tmespe/shiny_game_reviews_dashboard/blob/main/tidy_games_updated_14.03.RData?raw=true"))
+#load("20220206_134321_release_dates.RData")
+```
+As can be seen there are currently `r nrow(all_games)` games and `r nrow(all_companies)` companies in the datasets.
+The games and companies datasets contain `r ncol(all_games)` and `r ncol(all_companies)` columns respectively.
+
+For the purpose of the analysis we are not interested in all columns, as many of them contain database type information
+that are not relevant analysis, and many contain a lot of missing values.
+
+## Selecting and cleaning relevant data
+### Games
+For the current analysis we are primarily interested in games that have received at least one critic review. I therefore
+start by filtering only games with review scores. Secondly, since we are interested in how games have evolved over time
+I also filter out any game that does not have a release date. For the relevant columns the following are included
+
+
+| Column                  | Description                                                         |
+|-------------------------|---------------------------------------------------------------------|
+| id                      | Id of game on IGDB                                                  |
+| first_release_date      | The date the game was first released.                               |
+| game_modes              | List of supported game modes (co-op, PvP etc.)                      |
+| genres                  | Genres of game (Role-playing game, First person shooter etc.)       |
+| name                    | Name of the game                                                    |
+| platforms               | The platforms the game is released on                               |
+| summary                 | A brief text summary of the game                                    |
+| age_ratings             | The age ratings the game has received                               |
+| player_perspectives     | The perspective of the game (first-person, third-person etc.)       |
+| total_rating            | The average user review score of the game                           |
+| total_rating_count      | The count of user reviews                                           |
+| aggregated_rating       | The average professional critic review score of the game            |
+| aggregated_rating_count | The count of professional critic reviews of the game                |
+| follows                 | The amount of user follows a game has on IGDB                       |
+| hypes                   | The amount of user follows the game had on IGDB before release date |
+| storyline               | A brief description of the games storyline                          |
+
+```{r message = FALSE, warning = FALSE}
+not_all_na <- function(x)
+  any(!is.na(x))
+
+
+games_with_reviews <- games_df %>%
+  filter(!is.na(aggregated_rating),!is.na(first_release_date)) %>%
+  select(
+    id,
+    first_release_date,
+    game_modes,
+    genres,
+    name,
+    platforms,
+    themes,
+    game_engines,
+    keywords,
+    similar_games,
+    release_dates,
+    summary,
+    age_ratings,
+    player_perspectives,
+    total_rating,
+    total_rating_count,
+    aggregated_rating,
+    aggregated_rating_count,
+    follows,
+    hypes,
+    storyline,
+    release_dates,
+    collection,
+    cover
+  ) %>%
+  mutate(
+    first_release_date = as.Date(as.POSIXct(first_release_date, origin = "1970-01-01")),
+    aggregated_rating = round(aggregated_rating, 2),
+    total_rating = round(total_rating, 2),
+    first_release_year = year(first_release_date),
+    cover = str_replace(cover$url, "//", "https://") %>% str_replace("t_thumb", "t_cover_big"),
+    collection = collection$name
+  ) %>%
+  rename(
+    game_id = id
+    
+  )
+
+games_with_reviews %>%
+  glimpse()
+
+```
+
+```{r}
+save(games_with_reviews, file = "tidy_games_updated_14.03.RData")
+```
+
+```{r echo = F}
+platform_counts <- all_games %>%
+  select(platforms, first_release_date) %>%
+  unnest(platforms, names_repair = "unique", names_sep = "_") %>%
+  mutate(year = year(as.Date(first_release_date, origin = lubridate::origin))) %>%
+  group_by(platforms_name, year) %>%
+  summarise(n_releases = n()) %>%
+  arrange(desc(n_releases))
+
+platform_counts %>%
+  head(5) %>%
+  ggplot(aes(x = platforms_name, y = n_releases, fill = platforms_name)) +
+  geom_col() +
+  theme_fivethirtyeight()
+```
+```{r}
+vr <- games_with_reviews %>%
+        unnest(genre_id, names_repair = "unique", names_sep = "_") %>%
+        unnest(platform_id, names_repair = "unique", names_sep = "_") %>%
+        filter(str_detect(platform_id_name, "VR")) %>%
+        group_by(platform_id_name, first_release_year) %>%
+        summarise(platform_releases = n()) %>%
+        arrange(desc(platform_releases)) %>%
+        ggplot(aes(x = first_release_year, y = platform_releases, fill = platform_id_name)) +
+        geom_col() +
+        scale_fill_manual(values=c("grey", "grey", "darkblue", "grey"))
+        theme_fivethirtyeight()
+
+```
+```{r}
+platform_colors <-  c("black", "#fe0016", "brown", "#357EC7", "#003087",
+                          "#17569b", "#107C10")
+
+vr <- games_with_reviews %>%
+        unnest(release_dates, names_repair = "unique", names_sep = "_") %>%
+        unnest(platforms, names_repair = "unique", names_sep = "_") %>% 
+        unnest(platforms_platform_family, names_repair = "unique", names_sep = "_") %>% 
+        clean_names() %>% 
+        mutate(year = year(as.POSIXct(release_dates_date, origin = "1970-01-01"))) %>%  
+        mutate(platform_family_name = ifelse(platforms_name == "PC (Microsoft Windows)",
+                                             "PC", platforms_platform_family_name)) %>%
+        mutate(platform_family_name = factor(replace_na(platform_family_name, "Other"))) %>%
+        group_by(platform_family_name, year) %>%
+        summarise(games_pr_platform = n()) %>% 
+        ggplot(aes(x = year, y = games_pr_platform, color = platform_family_name)) +
+        geom_line(show.legend = FALSE, size = 1.2) +
+        facet_grid(platform_family_name ~ ., scales = "free_y") +
+        scale_x_continuous(n.breaks = 20) +
+        scale_color_manual(values = unlist(platform_colors)) +
+        theme_fivethirtyeight() +
+        labs(title = "Number of games released per platform", y = "Count of games", x = "") +
+        theme(plot.title = element_text(hjust = 0.5),
+              strip.text.x = element_text(size = 8, face = "bold"))
+
+vr
+
+```
+
+
+After filtering we are left with **`r nrow(games_with_reviews)`** rows and **`r ncol(games_with_reviews)`** columns.
+
+
+## Investigating games released over time
+Games have always been heavily connected to the platform they release on, with some games even being exclusive to
+a certain platform. An interesting starting point would therefore be to investigate how many games have released
+over time per platform. Since there are `r nrow(igdb_platforms)` in the dataset, I will use the platform family as a
+comparison. There are 6 main platform families. As a reminded for this analysis we are only looking at games with at
+leas one registered critic review.
+
+- Linux
+- Nintendo
+- Pc
+- Playstation
+- Sega
+- Xbox
+
+All other minor platforms have been divided into an *other* category.
+
+Doing this requires a bit of data manipulation as we first need to join the platform_family dataset to the platforms
+dataset.
+
+```{r message = FALSE, warning = FALSE}
+# Joining platform families to platforms on platform_family_id = platform_id
+igdb_platform_fam <- igdb_platforms %>%
+  left_join(igdb_platform_family, by = c("platform_family" = "id")) %>%
+  rename(platform_family_name = name.y, platform_id = id) %>%
+
+  # PC is not considered a platform family in the dataset, but is generally 
+  # considered a platform, so make it one.
+  mutate(
+    platform_family_name = ifelse(name.x == "PC (Microsoft Windows)", "PC", platform_family_name)
+  ) %>%
+
+  # Group all platforms that don't have a platform family into "other"
+  mutate(platform_family_name = factor(replace_na(platform_family_name, "Other"))) %>%
+  select(-platform_logo,-name.x,-category)
+
+# Filter games to keep only neeced columns
+filtered_games <- games_with_reviews %>%
+  unnest(platform_id) %>%
+  select(game_id,
+         name,
+         platform_id,
+         aggregated_rating,
+         total_rating,
+         follows) %>%
+  mutate(
+    aggregated_rating = round(aggregated_rating, 2),
+    total_rating = round(total_rating, 2),
+    follows = as.integer(follows)
+  )
+
+# Merge platform families with games  on platform_id
+merged_platforms <- merge(x = filtered_games,
+                          y = igdb_platform_fam,
+                          by = "platform_id") %>%
+  unique()
+
+# Filter release dates to drop duplicate values for platform and year. 
+#This can happen if a game
+# is released in different regions for different years.
+release_dates_filtered <-
+  all_release_dates[!duplicated(all_release_dates[, c("platform_id", "game_id")]),
+                    c("game_id", "platform_id", "y")]
+
+# Merge the combined platforms and games with filtered release dates on game_id 
+# and platform_id
+merged_release_dates <- merge(x = merged_platforms,
+                              y = release_dates_filtered,
+                              on = c("game_id", "platform_id")) %>%
+  # Keep only rows with years
+  drop_na(y) %>%
+  select(platform_family_name,
+         name ,
+         year = y,
+         aggregated_rating,
+         total_rating,
+         follows)
+
+merged_release_dates %>%
+  summary()
+```
+
+We see that the first registered game was released in 1971 and that playstation is the platform with the largest
+registered amount of games released. As for ratings both the average critic rating and user rating is
+around 70. The mean follows remain quite low at only 27, but the variance is quite large.
+
+### Plotting games by year and platform
+I'll use ggplot2 to visualize the number of games with critic reviews over time with a line plot. The y scales
+will be set to free, since some of the platforms have a much higher game count, and would be difficult to see
+otherwise.
+```{r message = FALSE, warning = FALSE}
+platforms_plot <- merged_release_dates %>%
+  group_by(platform_family_name, year) %>%
+  summarise(games_pr_platform = n()) %>%
+  ggplot(aes(x = year, y = games_pr_platform, color = platform_family_name)) +
+  geom_line(show.legend = FALSE, size = 1.2) +
+  facet_grid(platform_family_name ~ ., scales = "free_y") +
+  scale_x_continuous(n.breaks = 20) +
+  theme_fivethirtyeight() +
+  labs(title = "Number of games released per platform", y = "Count of games", x = "") +
+  theme(plot.title = element_text(hjust = 0.5),
+        strip.text.x = element_text(size = 8, face = "bold"))
+platforms_plot
+```
+
+We see from the plot that *other* is the platform with the first released games. As others contain all the early arcade
+platforms, this is to be expected. We see that Xbox is the latest platform family to arrive in 2001. Moreover, Sega is
+the only platform family to not exist anymore.
+
+All platforms look to have an increased amount of games with reviews in the period of 2013-2020,
+with Nintendo peaking in the more recent years.
+
+```{r message = FALSE, warning = FALSE}
+merged_release_dates %>%
+  filter(platform_family_name == "Sega") %>%
+  filter(year == max(year)) %>%
+  select(year, name)
+```
+We see that the last game released for the Sega platform was *Tanglewood* in 2018, at which point the Sega platform was
+virtually dead.
+
+As for the overall distribution of games a histogram would be suitable. Below I plot a histogram showing the distribution
+with a kernel density enabled.
+```{r message = FALSE, warning = FALSE}
+games_with_reviews %>%
+  ggplot(aes(x = year(first_release_date))) +
+  geom_histogram(aes(y = ..density..),
+                 color = "black",
+                 fill = "lightblue",
+                 bins = 20)  +
+  labs(title = "Distribution of release dates by year", sub="In density", y = "Density of release dates", x = "Year") +
+  scale_x_continuous(n.breaks = 10, limits = c(1979, 2021)) +
+  geom_density(alpha = .2, fill = "darkblue") +
+  theme_fivethirtyeight()
+  #theme(plot.title = element_text(hjust = 0.5))
+```
+
+As can be seen from the histogram there has been a steady increase of games released with the peak being in 2008.
+This is in line with the overall evolution of the industry where revenue has increased year over year.
+
+### Review scores by platform
+Now that we have an overview of the platform families and distribution of games released, we will move on to examining
+the review scores themselves.
+
+We'll first look at the overall distribution with a histogram with a kernel density curve.
+```{r message = FALSE, warning = FALSE}
+ratings_plot <- games_with_reviews %>%
+  ggplot(aes(x = aggregated_rating)) +
+  geom_histogram(aes(y = ..density..),
+                 color = "black",
+                 fill = "lightblue",
+                 bins = 40)  +
+  labs(title = "Distribution of critic review scores", y = "Count of games", x = "Year") +
+  geom_density(alpha = .2, fill = "darkblue") +
+  geom_vline(
+    aes(xintercept = mean(aggregated_rating)),
+    color = "blue",
+    linetype = "dashed",
+    size = 1
+  ) +
+  theme_fivethirtyeight() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_text(
+    aes(x = mean(aggregated_rating),  label = round(mean(aggregated_rating), 1)),
+    y = 0.048,
+    nudge_x = -4,
+    size = 4,
+    family = "Chivo",
+    check_overlap = T
+  )
+ratings_plot
+```
+
+As can be seen by the plot, The distribution of review scores is left skewed with a long tail of scores under 50.
+The average review score is 68.9.
+
+### Investigating the relationship between review scores and follows
+For the last part of the analysis we'll be taking a look at the relationship between review scores and follows. For this
+we'll use a scatter plot.
+```{r message = FALSE, warning = FALSE}
+platforms_plot <- merged_release_dates %>%
+  group_by(platform_family_name, year) %>%
+  filter(follows > 1) %>%
+  ggplot(aes(x = follows, y = aggregated_rating, color = platform_family_name)) +
+  geom_jitter(size = 1.2, alpha = 0.9) +
+  geom_smooth(data = merged_release_dates %>% filter(platform_family_name == "Xbox"),
+              se = F) +                       # c) on filtered data
+  geom_smooth(data = merged_release_dates %>% filter(platform_family_name == "Nintendo"),
+              se = F) +                       # c) on filtered data
+  geom_smooth(data = merged_release_dates %>% filter(platform_family_name == "PlayStation"),
+              se = F) +                       # c) on filtered data
+  geom_smooth(data = merged_release_dates %>% filter(platform_family_name == "PC"),
+              se = F) +                       # c) on filtered data
+  geom_vline(
+    aes(xintercept = mean(follows)),
+    color = "blue",
+    linetype = "dashed",
+    size = 1
+  ) +
+  theme_fivethirtyeight() +
+  scale_x_log10()
+  labs(title = "Critic reviews and likes per platform", y = "Count of games", x = "") +
+  theme(plot.title = element_text(hjust = 0.5),
+        strip.text.x = element_text(size = 8, face = "bold")) +
+  geom_text(
+    aes(x = mean(follows),  label = round(mean(follows), 1)),
+    y = 2,
+    nudge_x = 20,
+    size = 4,
+    family = "Chivo",
+    check_overlap = T
+  )
+platforms_plot
+```
+We see that there is generally a positive correlation between review scores and likes, which is not that surprising.
+The average follows is quite low at 32.2, so it's difficult to draw any conclusions from this.
+
+## Next steps
+This has been a sneak peek at the IGDB analysis. This notebook will be continuously updated with more analysis of
+companies and more variables.
+

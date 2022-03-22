@@ -219,10 +219,10 @@ server <- function(session, input, output) {
                                                         "PC", platforms_name)))
   
   observeEvent(input$tabs, {
-    if (input$tabs == "plot") {
-      updateSliderInput(session, "year", value = c(min_year, max_year))
-    } else {
+    if (input$tabs == "overview") {
       updateSliderInput(session, "year", value = c(max_year -2, max_year))
+    } else {
+      updateSliderInput(session, "year", value = c(min_year, max_year))
     }
   })
   
