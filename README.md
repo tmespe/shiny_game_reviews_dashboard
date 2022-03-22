@@ -1,5 +1,8 @@
 # shiny_game_reviews_dashboard
 A Dashboard of game reviews from IGDB
+
+![image](https://user-images.githubusercontent.com/12337620/159508522-cbcaa5d6-ea6b-4818-8c56-e6f5a2d24fa8.png)
+
 This repo contains data for my [IBGD Games Dashboard](https://tmespe.shinyapps.io/Games_dashboard/). 
 The data for the dashboard is gathered from [IGDB ( Internet Games Database)](https://www.igdb.com/about).
 
