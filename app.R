@@ -28,9 +28,9 @@ library(tidytext)
 library(textdata)
 
 
-load(url("https://github.com/tmespe/shiny_game_reviews_dashboard/blob/main/tidy_games_2022-03-20.RData?raw=true"))
+load(url("https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/tidy_games_2022-03-20.RData?raw=true"))
 #load("tidy_games_updated.RData.RData")
-load(url("https://github.com/tmespe/shiny_game_reviews_dashboard/blob/main/igdb_platform_family.RData?raw=true"))
+load(url("https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/igdb_platform_family.RData?raw=true"))
 
 # color scheme : https://colorhunt.co/palette/1b1a17f0a500e45826e6d5b8
 mytheme <- create_theme(
@@ -109,7 +109,7 @@ ui <- dashboardPage(
         min = min_rating,
         max = max_rating,
         value = c(min_rating, max_rating),
-        step = 10,
+        step = 5,
         sep = "",
       ),
       selectInput("genres", h4("Genre"),
