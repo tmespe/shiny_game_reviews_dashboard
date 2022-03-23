@@ -57,7 +57,8 @@ min_rating = min(games_with_reviews$aggregated_rating)
 max_rating = max(games_with_reviews$aggregated_rating)
 
 
-ui <- dashboardPage(
+ui <- tagList(
+dashboardPage(
   dashboardHeader(title = "Games Dashboard"),
 
   # Header zone
@@ -169,7 +170,16 @@ ui <- dashboardPage(
             includeHTML("www/about.html"),
             style = "font-size:1.5em"
             )
-  ))
+  ))),
+    tags$footer(HTML("Designed and developed by <a href=mailto:terje.m.espedal@gmail.com>Terje Espedal</a>"), 
+                tags$style("footer {
+                              background-color:#1B1A17;
+                              color: #E6D5B8;
+                              text-align: center;
+                              } 
+                             a:link {
+                              color:#E45826;
+                             }"))
 )
 
 server <- function(session, input, output) {
