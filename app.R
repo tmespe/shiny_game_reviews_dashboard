@@ -17,6 +17,7 @@ library(shiny)
 library(shinydashboard)
 library(DT)
 library(fresh)
+library(shinyWidgets)
 library(spsComps)
 library(reactable)
 #library(bs4Dash)
@@ -55,6 +56,20 @@ min_year = min(games_with_reviews$first_release_year)
 max_year = max(games_with_reviews$first_release_year)
 min_rating = min(games_with_reviews$aggregated_rating)
 max_rating = max(games_with_reviews$aggregated_rating)
+
+platforms <- games_with_reviews %>% unnest(release_dates, names_repair = "unique", names_sep = "_") %>%
+  unnest(platforms, names_repair = "unique", names_sep = "_") %>%
+  unnest(platforms_platform_family, names_repair = "unique", names_sep = "_") %>%
+  filter(release_dates_platform == platforms_id) %>%
+  clean_names() %>% 
+  left_join(igdb_platform_family, by = c("platforms_platform_family" = "id")) %>%
+  rename(name = name.x, platforms_family_name = name.y) %>% 
+  mutate(year = year(as.POSIXct(release_dates_date, origin = "1970-01-01"))) %>%
+  mutate(platform_family_name = ifelse(platforms_name == "PC (Microsoft Windows)",
+                                       "PC", platforms_family_name)) %>%
+  mutate(platform_family_name = factor(replace_na(platform_family_name, "Other"))) %>% 
+  mutate(platforms_name = ifelse(platforms_name == "PC (Microsoft Windows)",
+                                 "PC", platforms_name))
 
 
 ui <- tagList(
@@ -119,6 +134,12 @@ dashboardPage(
                                 pull(genres_name) %>%
                                 unique()),
                   selected = "All genres", multiple = T
+      ),
+      selectInput("platforms", h4("Platform family"),
+                  choices = c("All platforms", platforms %>%
+                                pull(platforms_family_name) %>%
+                                unique()),
+                  selected = "All platforms", multiple = T
       )
     )
     
@@ -191,7 +212,7 @@ server <- function(session, input, output) {
                  first_release_year <= input$year[2],
                  aggregated_rating_count > 3,
                  aggregated_rating >= input$rating[1],
-                 aggregated_rating <= input$rating[2]
+                 aggregated_rating <= input$rating[2],
           ) %>% nest(genres = c(genres_name, genres_id))
       } else if (length(input$genres) != F) {
         games_with_reviews %>% unnest(genres, names_repair = "unique", names_sep = "_") %>% 
