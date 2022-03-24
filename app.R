@@ -479,9 +479,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(1) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(1) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, 
@@ -496,9 +498,11 @@ server <- function(session, input, output) {
      {
        game_data <- data() %>%
          arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-         slice(2) %>% select(name, cover, aggregated_rating, url)
-       html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                      game_data %>% pull(aggregated_rating), "</h4></p>")
+         slice(2) %>% select(name, cover, aggregated_rating, url, first_release_date)
+       relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+       html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                      "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                      "</p>")
        tagList(tags$div(tags$a(href=game_data %>% pull(url),
                                target="_blank",
                                tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -512,9 +516,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(3) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(3) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                             target="_blank",
                             tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -528,9 +534,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(4) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(4) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -547,9 +555,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(5) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(5) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -563,9 +573,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(6) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(6) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -579,9 +591,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(7) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(7) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -595,9 +609,11 @@ server <- function(session, input, output) {
     {
       game_data <- data() %>%
         arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(8) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
+        slice(8) %>% select(name, cover, aggregated_rating, url, first_release_date)
+      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+                     "</p>")
       tagList(tags$div(tags$a(href=game_data %>% pull(url),
                               target="_blank",
                               tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
@@ -607,21 +623,6 @@ server <- function(session, input, output) {
     }
   )
   
-  output$cover8 <- renderUI(
-    {
-      game_data <- data() %>%
-        arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(8) %>% select(name, cover, aggregated_rating, url)
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), "</h4></strong><h4>Rating: ", 
-                     game_data %>% pull(aggregated_rating), "</h4></p>")
-      tagList(tags$div(tags$a(href=game_data %>% pull(url),
-                              target="_blank",
-                              tags$img(src = game_data %>% pull(cover), height = 352, width = 264, style = "border: 0.5em solid #E45826")), 
-                       tags$div(HTML(html)),
-                       class = "text-center",
-      ))
-    }
-  )
   
   covers <- reactive( data() %>%
     arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
