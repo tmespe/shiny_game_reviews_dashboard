@@ -8,6 +8,7 @@ library(plotly)
 library(purrr)
 library(janitor)
 library(ggthemes)
+library(purrr)
 library(scales)
 library(tm)
 
@@ -119,7 +120,8 @@ dashboardPage(
                                 pull(genres_name) %>%
                                 unique()),
                   selected = "All genres", multiple = T
-      )
+      ),
+      textInput("n_covers", "Numer of covers", value = 12)
     )
     
   )),
@@ -474,25 +476,54 @@ server <- function(session, input, output) {
   
   # Covers
   
-  # Row 1
-  output$cover1 <- renderUI(
-    {
-      game_data <- data() %>%
-        arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
-        slice(1) %>% select(name, cover, aggregated_rating, url, first_release_date)
-      relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
-      html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
-                     "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
-                     "</p>")
-      tagList(tags$div(tags$a(href=game_data %>% pull(url),
-                              target="_blank",
-                              tags$img(src = game_data %>% pull(cover), height = 352, 
-                                       width = 264, style = "border: 0.5em solid #E45826")), 
-                       tags$div(HTML(html)),
-                       class = "text-center",
-      ))
+  render_cover <- function(name, cover, aggregated_rating, url, first_release_date) {
+    #print(row$first_release_date)
+    #relase_date <- row$first_release_date #%>% strftime(format = "%d %b, %Y")
+    html <- paste0("<p><strong><h4>", name, " (", first_release_date, ")", "</h4></strong>", 
+                   "<h4>Rating:", aggregated_rating, "</h4>",
+                   "</p>")
+
+    tagList(tags$div(tags$a(href=url,
+                            target="_blank",
+                            tags$img(src = cover, height = 352, 
+                                     width = 264, style = "border: 0.5em solid #E45826")), 
+                     tags$div(HTML(html)),
+                     class = "text-center",
+    ))
+  }
+  
+  render_covers <- function(df) {
+    game_data <- df %>% arrange(desc(aggregated_rating), desc(aggregated_rating_count), 
+                                desc(follows), hypes, total_rating_count) %>%
+      select(name, cover, aggregated_rating, url, first_release_date) %>% slice(1:3)
+    covers <- pmap(game_data, render_cover)
+  }
+  
+  output$covers <- renderUI({
+    n_rows <- input$n_covers
+    render_covers(data(), 10)
     }
-  )
+  )  
+  
+  # Row 1
+  # output$cover1 <- renderUI(
+  #   {
+  #     game_data <- data() %>%
+  #       arrange(desc(aggregated_rating), desc(aggregated_rating_count), desc(follows), hypes, total_rating_count) %>%
+  #       slice(1) %>% select(name, cover, aggregated_rating, url, first_release_date)
+  #     relase_date <- game_data %>% pull(first_release_date) %>% strftime(format = "%d %b, %Y")
+  #     html <- paste0("<p><strong><h4>", game_data %>% pull(name), " (", relase_date, ")", "</h4></strong>", 
+  #                    "<h4>Rating:", game_data %>% pull(aggregated_rating), "</h4>",
+  #                    "</p>")
+  #     tagList(tags$div(tags$a(href=game_data %>% pull(url),
+  #                             target="_blank",
+  #                             tags$img(src = game_data %>% pull(cover), height = 352, 
+  #                                      width = 264, style = "border: 0.5em solid #E45826")), 
+  #                      tags$div(HTML(html)),
+  #                      class = "text-center",
+  #     ))
+  #   }
+  # )
   
    output$cover2 <- renderUI(
      {
