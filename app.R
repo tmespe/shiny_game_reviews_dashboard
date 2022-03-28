@@ -137,6 +137,7 @@ dashboardPage(
             fluidRow(valueBoxOutput("box1", width = 4),
                      valueBoxOutput("box2", width = 4),
                     valueBoxOutput("box3", width = 4), class = "text-info"),
+            uiOutput("covers"),
             fluidRow(column(3, uiOutput("cover1")),
                      column(3, uiOutput("cover2")),
                      column(3, uiOutput("cover3")),
@@ -483,25 +484,28 @@ server <- function(session, input, output) {
                    "<h4>Rating:", aggregated_rating, "</h4>",
                    "</p>")
 
-    tagList(tags$div(tags$a(href=url,
+    tagList(tags$a(href=url,
                             target="_blank",
                             tags$img(src = cover, height = 352, 
-                                     width = 264, style = "border: 0.5em solid #E45826")), 
+                                     width = 264, style = "border: 0.5em solid #E45826",)), 
                      tags$div(HTML(html)),
                      class = "text-center",
-    ))
+                     style = "margin: 20px",
+                     height = 352, 
+                     width = 264,
+    )
   }
   
-  render_covers <- function(df) {
+  render_covers <- function(df, n) {
     game_data <- df %>% arrange(desc(aggregated_rating), desc(aggregated_rating_count), 
                                 desc(follows), hypes, total_rating_count) %>%
-      select(name, cover, aggregated_rating, url, first_release_date) %>% slice(1:3)
+      select(name, cover, aggregated_rating, url, first_release_date) %>% slice(1:n)
     covers <- pmap(game_data, render_cover)
   }
   
   output$covers <- renderUI({
-    n_rows <- input$n_covers
-    render_covers(data(), 10)
+    covers <- render_covers(data(), input$n_covers)
+    do.call(shiny::flowLayout, c(covers, cellArgs = list(width = "300px")))
     }
   )  
   
