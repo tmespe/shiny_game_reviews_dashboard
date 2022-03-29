@@ -31,7 +31,7 @@ library(textdata)
 
 load(
   url(
-    "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/tidy_games_2022-03-20.RData?raw=true"
+    "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/tidy_games_2022-03-29.RData?raw=true"
   )
 )
 #load("tidy_games_updated.RData.RData")
@@ -666,8 +666,6 @@ server <- function(session, input, output) {
              aggregated_rating,
              url,
              first_release_date) {
-      #print(row$first_release_date)
-      #relase_date <- row$first_release_date #%>% strftime(format = "%d %b, %Y")
       html <-
         paste0(
           "<p><strong><h4>",
@@ -676,7 +674,7 @@ server <- function(session, input, output) {
           first_release_date,
           ")",
           "</h4></strong>",
-          "<h4>Rating:",
+          "<h4>Rating: ",
           aggregated_rating,
           "</h4>",
           "</p>"
