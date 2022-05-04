@@ -11,6 +11,7 @@ library(ggthemes)
 library(purrr)
 library(scales)
 library(tm)
+library(mongolite)
 
 
 # Shiny
@@ -28,18 +29,49 @@ library(wordcloud)
 library(tidytext)
 library(textdata)
 
+readRenviron(".Renviron")
 
-load(
-  url(
-    "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/tidy_games_2022-03-29.RData?raw=true"
-  )
-)
-#load("tidy_games_updated.RData.RData")
-load(
-  url(
-    "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/igdb_platform_family.RData?raw=true"
-  )
-)
+mongo_user <- Sys.getenv("MONGO_DB_USER")
+mongo_pass <- Sys.getenv("MONGO_DB_PASS")
+mongo_host <- Sys.getenv("MONGO_DB_HOST")
+
+# load(
+#   url(
+#     "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/tidy_games_2022-03-29.RData?raw=true"
+#   )
+# )
+# #load("tidy_games_updated.RData.RData")
+# load(
+#   url(
+#     "https://github.com/tmespe/shiny_game_reviews_dashboard/blob/master/data/igdb_platform_family.RData?raw=true"
+#   )
+# )
+
+options(mongodb = list(
+  "host" = mongo_host,
+  "username" = mongo_user,
+  "password" = mongo_pass
+))
+
+db_name <- "igdb"
+collection_name <- "igdb_games"
+
+load_data <- function() {
+  # Connect to the database
+  db <- mongo(collection = collection_name,
+              url = sprintf(
+                "mongodb+srv://%s:%s@%s/%s",
+                options()$mongodb$username,
+                options()$mongodb$password,
+                options()$mongodb$host,
+                db_name
+              ),
+              options = ssl_options(weak_cert_validation = TRUE))
+  # Read all the entries
+  data <- db$find()
+  data
+}
+games_with_reviews <- load_data() %>% filter(lengths(genres) > 0)
 
 # color scheme : https://colorhunt.co/palette/1b1a17f0a500e45826e6d5b8
 mytheme <- create_theme(
@@ -139,6 +171,7 @@ ui <- tagList(
             choices = c(
               "All genres",
               games_with_reviews %>%
+                #drop_na(c(genres, game_engines, collection, themes, follows, hypes, storyline)) %>% 
                 unnest(genres, names_repair = "unique", names_sep = "_") %>%
                 pull(genres_name) %>%
                 unique()
@@ -248,7 +281,8 @@ ui <- tagList(
 server <- function(session, input, output) {
   data <-
     reactive(if ("All genres" %in% input$genres) {
-      games_with_reviews %>% unnest(genres, names_repair = "unique", names_sep = "_") %>%
+      games_with_reviews %>% 
+        unnest(genres, names_repair = "unique", names_sep = "_") %>%
         filter(
           first_release_year >= input$year[1],
           first_release_year <= input$year[2],
@@ -257,7 +291,8 @@ server <- function(session, input, output) {
           aggregated_rating <= input$rating[2]
         ) %>% nest(genres = c(genres_name, genres_id))
     } else if (length(input$genres) != F) {
-      games_with_reviews %>% unnest(genres, names_repair = "unique", names_sep = "_") %>%
+      games_with_reviews %>% 
+        unnest(genres, names_repair = "unique", names_sep = "_") %>%
         filter(
           first_release_year >= input$year[1],
           first_release_year <= input$year[2],
@@ -267,7 +302,8 @@ server <- function(session, input, output) {
           genres_name %in% input$genres
         ) %>% nest(genres = c(genres_name, genres_id))
     } else {
-      games_with_reviews %>% unnest(genres, names_repair = "unique", names_sep = "_") %>%
+      games_with_reviews %>%
+        unnest(genres, names_repair = "unique", names_sep = "_") %>%
         filter(
           first_release_year >= input$year[1],
           first_release_year <= input$year[2],
